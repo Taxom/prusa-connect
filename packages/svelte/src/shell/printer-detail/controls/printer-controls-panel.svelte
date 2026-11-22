@@ -256,7 +256,8 @@
             onCommand={commands.onCommand}
             printing={PRINTING_LIKE.includes(observedState)}
             bedOnZ={bedTravelsOnZ(device.model)}
-            buildVolume={device.build_volume}
+            model={device.model}
+        buildVolume={device.build_volume}
             printerState={observedState}
             motion={previewEnabled ? preview : undefined}
           />
