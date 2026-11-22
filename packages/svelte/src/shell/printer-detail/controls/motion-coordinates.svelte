@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { formatNumber, formatUnit, t } from '../../../i18n';
   import type { Axis, Position } from './motion-coordinates';
+  import { canMoveTo, type AxisBounds } from './motion-bounds';
   import {
     ArrowDownIcon,
     ArrowLeftIcon,
@@ -16,6 +17,8 @@
 
   let {
     limits,
+    travelBounds,
+    targetBounds,
     position,
     xyDisabled,
     zDisabled,
@@ -30,6 +33,8 @@
     commandPanel,
   }: {
     limits: Position;
+    travelBounds?: AxisBounds | undefined;
+    targetBounds?: AxisBounds | undefined;
     position: Partial<Record<Axis, number | undefined>>;
     xyDisabled: boolean;
     zDisabled: boolean;
@@ -73,13 +78,23 @@
   const mm = (value: number) =>
     formatUnit(value, 'mm', { maximumFractionDigits: 2 });
   const round = (value: number) => Math.round(value * 10) / 10;
+  const targetIsSafe = (axis: Axis, from: number | undefined, to: number) =>
+    travelBounds !== undefined && targetBounds !== undefined
+      ? canMoveTo(travelBounds, targetBounds, axis, from, to)
+      : from !== undefined && Number.isFinite(from) && to >= 0 && to <= limits[axis];
+  const canJog = (axis: Axis, sign: -1 | 1) => {
+    if (axis === 'z' ? zDisabled : xyDisabled) return false;
+    const from = position[axis];
+    return from !== undefined &&
+      targetIsSafe(axis, from, Number((from + Number(step) * sign).toFixed(3)));
+  };
 
   function jog(axis: Axis, sign: -1 | 1) {
     const from = position[axis];
     if (moving || from === undefined || (axis === 'z' ? zDisabled : xyDisabled))
       return;
     const target = Number((from + Number(step) * sign).toFixed(3));
-    if (target < 0 || target > limits[axis]) {
+    if (!targetIsSafe(axis, from, target)) {
       localFeedback = t('printerDetailControls.coordinates.limit');
       return;
     }
@@ -116,8 +131,10 @@
   function movePlateDrag(event: PointerEvent) {
     const drag = xyDrag;
     if (event.pointerId !== drag?.pointerId || xyDisabled) return;
-    const clamp = (axis: 'x' | 'y', value: number) =>
-      Math.min(limits[axis], Math.max(0, round(value)));
+    const clamp = (axis: 'x' | 'y', value: number) => {
+      const target = targetBounds?.[axis];
+      return Math.min(target?.max ?? limits[axis], Math.max(target?.min ?? 0, round(value)));
+    };
     xyTarget = {
       x: clamp(
         'x',
@@ -146,6 +163,8 @@
       xyDisabled ||
       busy ||
       !target ||
+      !targetIsSafe('x', position.x, target.x) ||
+      !targetIsSafe('y', position.y, target.y) ||
       (event.clientX === drag.startX && event.clientY === drag.startY)
     )
       return;
@@ -217,7 +236,7 @@
     variant="secondary"
     size="md"
     class="jog-button min-w-0 gap-1 font-mono tabular-nums"
-    disabled={axis === 'z' ? zDisabled : xyDisabled}
+    disabled={!canJog(axis, sign)}
     aria-disabled={moving || undefined}
     onclick={() => jog(axis, sign)}
   >
