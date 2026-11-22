@@ -38,6 +38,7 @@
   import MachineUtilities from './machine-utilities.svelte';
   import MotionCoordinates from './motion-coordinates.svelte';
   import type { Axis, Position } from './motion-coordinates';
+  import { inAxisBounds, motionBounds } from './motion-bounds';
 
   let {
     resolve,
@@ -48,6 +49,7 @@
     bedOnZ,
     motion,
     buildVolume,
+    model,
     printerState,
     homing,
     coordinatesOnly = false,
@@ -56,6 +58,7 @@
     bedOnZ: boolean;
     motion?: Snippet<[Snippet<[Snippet]>]> | undefined;
     buildVolume?: Device['build_volume'];
+    model: string;
     printerState: PrinterState;
     homing: boolean;
     coordinatesOnly?: boolean;
@@ -94,12 +97,23 @@
     y: reading(AXIS_Y_PATH),
     z: reading(AXIS_Z_PATH),
   });
+  const bounds = $derived(limits === undefined ? undefined : motionBounds(model, limits));
   const rangeOK = (axis: Axis, position: number | undefined) =>
-    limits !== undefined &&
-    position !== undefined &&
-    Number.isFinite(position) &&
-    position >= 0 &&
-    position <= limits[axis];
+    bounds !== undefined && inAxisBounds(bounds.travel, axis, position);
+  // A head at the real endstop may be outside the inset target margin.
+  // Allow short steps toward the inset, but never further outward.
+  const targetOK = (axis: Axis, from: number | undefined, to: number) => {
+    if (
+      bounds === undefined ||
+      !rangeOK(axis, from) ||
+      !Number.isFinite(to) ||
+      !inAxisBounds(bounds.travel, axis, to)
+    ) return false;
+    if (inAxisBounds(bounds.target, axis, to)) return true;
+    const { min, max } = bounds.target[axis];
+    return (from! < min && to > from! && to < min) ||
+      (from! > max && to < from! && to > max);
+  };
   const coordinateXyDisabled = $derived(
     xyBlocked ||
       !rangeOK('x', exactPosition.x) ||
@@ -223,7 +237,7 @@
     const delta = (axis: Axis) => {
       const from = exactPosition[axis];
       const to = target[axis];
-      return to !== undefined && rangeOK(axis, to) && from !== undefined
+      return to !== undefined && targetOK(axis, from, to) && from !== undefined
         ? Number((to - from).toFixed(3))
         : 0;
     };
@@ -318,6 +332,8 @@
   {:else if limits}
     <MotionCoordinates
       {limits}
+      targetBounds={bounds?.target}
+      travelBounds={bounds?.travel}
       position={exactPosition}
       xyDisabled={coordinateXyDisabled}
       zDisabled={coordinateZDisabled}
