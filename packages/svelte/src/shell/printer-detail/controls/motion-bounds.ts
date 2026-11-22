@@ -7,7 +7,8 @@ export type AxisBounds = Readonly<
 /**
  * The build volume describes printable space, not always travel space.
  * Standard CORE One L firmware (v6.8.1, Configuration_COREONEL.h) has
- * X = [-2, 302], Y = [-8, 300] mm. Keep a 1 mm target margin.
+ * X = [-2, 302], Y = [-8, 300] mm. Keep a 1 mm target margin
+ * only at the negative endstops; positive targets use firmware limits.
  * The source reading may be on the actual endstop after homing, so
  * validating it against the inset target limits would strand the jogger.
  *
@@ -27,8 +28,8 @@ export function motionBounds(
     z: { min: 0, max: volume.z },
   };
   const target: AxisBounds = {
-    x: { min: coreOneL ? -1 : 0, max: volume.x + (coreOneL ? 1 : 0) },
-    y: { min: coreOneL ? -7 : 0, max: volume.y - (coreOneL ? 1 : 0) },
+    x: { min: coreOneL ? -1 : 0, max: volume.x + (coreOneL ? 2 : 0) },
+    y: { min: coreOneL ? -7 : 0, max: volume.y },
     z: { min: 0, max: volume.z },
   };
 
