@@ -211,6 +211,7 @@
         onCommand={motionPort.onCommand}
         printing={observedState === 'PRINTING' || observedState === 'PAUSED'}
         bedOnZ={bedTravelsOnZ(device.model)}
+        model={device.model}
         buildVolume={device.build_volume}
         printerState={observedState}
         motion={motionPreview ? preview : undefined}
