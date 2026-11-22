@@ -7,11 +7,11 @@ const bed = { x: 300, y: 300, z: 330 };
 describe('CORE One L jog limits', () => {
   const { travel, target } = motionBounds('COREONEL', bed);
 
-  it('uses the firmware XY travel range, inset by 1 mm for target moves', () => {
+  it('uses the firmware XY travel range, with 1 mm inset only at negative limits', () => {
     expect(travel.x).toEqual({ min: -2, max: 302 });
     expect(travel.y).toEqual({ min: -8, max: 300 });
-    expect(target.x).toEqual({ min: -1, max: 301 });
-    expect(target.y).toEqual({ min: -7, max: 299 });
+    expect(target.x).toEqual({ min: -1, max: 302 });
+    expect(target.y).toEqual({ min: -7, max: 300 });
   });
 
   it('allows movement back into the safe region after homing to Y = -7', () => {
@@ -28,11 +28,11 @@ describe('CORE One L jog limits', () => {
     expect(canMoveTo(travel, target, 'x', -2, -2.1)).toBe(false);
   });
 
-  it('rejects destinations that cross the inset limits', () => {
-    expect(canMoveTo(travel, target, 'x', 300, 301.1)).toBe(false);
-    expect(canMoveTo(travel, target, 'y', 298, 299.1)).toBe(false);
-    expect(canMoveTo(travel, target, 'y', 299.5, 299.4)).toBe(true);
-    expect(canMoveTo(travel, target, 'y', 299.5, 299.6)).toBe(false);
+  it('uses full positive firmware limits while refusing moves beyond them', () => {
+    expect(canMoveTo(travel, target, 'x', 300, 302)).toBe(true);
+    expect(canMoveTo(travel, target, 'x', 302, 302.1)).toBe(false);
+    expect(canMoveTo(travel, target, 'y', 298, 300)).toBe(true);
+    expect(canMoveTo(travel, target, 'y', 300, 300.1)).toBe(false);
   });
 
   it('leaves Z and other printers unchanged', () => {
