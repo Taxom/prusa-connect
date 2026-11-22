@@ -952,13 +952,17 @@ describe('PrinterControlsPanel', () => {
     const renderPlate = async (
       axes: Record<'x' | 'y' | 'z', number>,
       onCommand: PrinterControlsPanelProps['commands']['onCommand'],
+      model = 'MK4S',
     ) => {
       const { reported, source } = plate(axes);
       await render(PrinterControlsPanel, {
         props: props({
           device: {
             ...printer('IDLE', MOTION_VERBS),
-            build_volume: { x_mm: 250, y_mm: 210, z_mm: 220 },
+            model,
+            build_volume: model === 'CoreOneL'
+              ? { x_mm: 300, y_mm: 300, z_mm: 330 }
+              : { x_mm: 250, y_mm: 210, z_mm: 220 },
           },
           telemetry: source,
           commands: { onCommand },
@@ -1132,6 +1136,35 @@ describe('PrinterControlsPanel', () => {
           page.getByText('The printer has no usable position for this move.'),
         )
         .toBeVisible();
+    });
+
+    it('keeps the nozzle mounted when dragging across Y=0 on CORE One L', async () => {
+      const onCommand = vi.fn();
+      await renderPlate({ x: 220, y: -7, z: 2 }, onCommand, 'CoreOneL');
+      const nozzle = page
+        .getByRole('button', { name: 'Nozzle position on the build plate' })
+        .element() as HTMLElement;
+      nozzle.setPointerCapture = () => undefined;
+      const { left, top } = nozzle.getBoundingClientRect();
+      const pointer = (type: string, dy: number) =>
+        new PointerEvent(type, {
+          bubbles: true,
+          button: 0,
+          pointerId: 10,
+          isPrimary: true,
+          clientX: left + 10,
+          clientY: top + dy,
+        });
+
+      await expect.element(page.getByRole('button', { name: 'Y+' })).toBeEnabled();
+      nozzle.dispatchEvent(pointer('pointerdown', 0));
+      nozzle.dispatchEvent(pointer('pointermove', -30));
+      await expect
+        .element(page.getByRole('button', { name: 'Nozzle position on the build plate' }))
+        .toBeInTheDocument();
+      nozzle.dispatchEvent(pointer('pointercancel', -30));
+      await expect.element(page.getByRole('button', { name: 'Y+' })).toBeEnabled();
+      expect(onCommand).not.toHaveBeenCalled();
     });
 
     it('says why a drag is dropped when the reported position moved during it', async () => {
