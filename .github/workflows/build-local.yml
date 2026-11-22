@@ -1,0 +1,59 @@
+name: Build Connect Local (Linux AMD64)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Full Linux AMD64 binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          package_json_file: packages/typescript/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build and embed web interface
+        run: make embed-app
+
+      - name: Build full server
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          set -euo pipefail
+          test -f internal/transport/http/httpapi/appdist/index.html
+          mkdir -p build
+          VERSION="0.0.0-git.${GITHUB_SHA:0:12}"
+          go build -tags "full diagnostics observability postgres" \
+            -ldflags="-X github.com/prusa3d/prusa-connect/internal/kernel/version.stamped=$VERSION" \
+            -o build/prusa_connect_amd64 ./cmd/prusa-connect
+          chmod +x build/prusa_connect_amd64
+          build/prusa_connect_amd64 --version
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v6
+        with:
+          name: prusa-connect-linux-amd64
+          path: build/prusa_connect_amd64
+          if-no-files-found: error
+          retention-days: 14
