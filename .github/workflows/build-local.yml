@@ -2,6 +2,9 @@ name: Build Connect Local (Linux AMD64)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/core-one-l-safe-jog-limits
 
 permissions:
   contents: read
