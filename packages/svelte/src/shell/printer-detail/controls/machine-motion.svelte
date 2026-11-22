@@ -38,7 +38,7 @@
   import MachineUtilities from './machine-utilities.svelte';
   import MotionCoordinates from './motion-coordinates.svelte';
   import type { Axis, Position } from './motion-coordinates';
-  import { inAxisBounds, motionBounds } from './motion-bounds';
+  import { canMoveTo, inAxisBounds, motionBounds } from './motion-bounds';
 
   let {
     resolve,
@@ -102,18 +102,9 @@
     bounds !== undefined && inAxisBounds(bounds.travel, axis, position);
   // A head at the real endstop may be outside the inset target margin.
   // Allow short steps toward the inset, but never further outward.
-  const targetOK = (axis: Axis, from: number | undefined, to: number) => {
-    if (
-      bounds === undefined ||
-      !rangeOK(axis, from) ||
-      !Number.isFinite(to) ||
-      !inAxisBounds(bounds.travel, axis, to)
-    ) return false;
-    if (inAxisBounds(bounds.target, axis, to)) return true;
-    const { min, max } = bounds.target[axis];
-    return (from! < min && to > from! && to < min) ||
-      (from! > max && to < from! && to > max);
-  };
+  const targetOK = (axis: Axis, from: number | undefined, to: number) =>
+    bounds !== undefined &&
+    canMoveTo(bounds.travel, bounds.target, axis, from, to);
   const coordinateXyDisabled = $derived(
     xyBlocked ||
       !rangeOK('x', exactPosition.x) ||
