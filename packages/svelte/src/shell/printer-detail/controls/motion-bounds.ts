@@ -44,3 +44,23 @@ export const inAxisBounds = (
   Number.isFinite(value) &&
   value >= bounds[axis].min &&
   value <= bounds[axis].max;
+
+/** Check a destination, including safe inward recovery from an endstop. */
+export function canMoveTo(
+  travel: AxisBounds,
+  target: AxisBounds,
+  axis: Axis,
+  from: number | undefined,
+  to: number,
+): boolean {
+  if (
+    !inAxisBounds(travel, axis, from) ||
+    !Number.isFinite(to) ||
+    !inAxisBounds(travel, axis, to)
+  ) return false;
+
+  if (inAxisBounds(target, axis, to)) return true;
+  const { min, max } = target[axis];
+  return (from! < min && to > from! && to < min) ||
+    (from! > max && to < from! && to > max);
+}
