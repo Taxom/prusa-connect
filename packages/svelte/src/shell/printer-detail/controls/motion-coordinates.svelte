@@ -70,7 +70,9 @@
   let zSliderGeneration = $state(0);
   let xyDrag = $state.raw<PlateDrag>();
   let plot: HTMLDivElement;
-  const xy = $derived(xyTarget ?? position);
+  // Keep the dragged nozzle mounted even when the preview crosses the
+  // printable area's edge. Unmounting it loses pointer capture mid-drag.
+  const xy = $derived(xyTarget ?? xyDrag?.base ?? position);
   const moving = $derived(
     busy || xyDrag !== undefined || zTarget !== undefined,
   );
@@ -78,6 +80,10 @@
   const mm = (value: number) =>
     formatUnit(value, 'mm', { maximumFractionDigits: 2 });
   const round = (value: number) => Math.round(value * 10) / 10;
+  // The drawing shows the printable plate; valid mechanical positions outside
+  // that rectangle remain draggable, with the marker at its nearest edge.
+  const plateFraction = (value: number, max: number) =>
+    Math.min(1, Math.max(0, value / max));
   const targetIsSafe = (axis: Axis, from: number | undefined, to: number) =>
     travelBounds !== undefined && targetBounds !== undefined
       ? canMoveTo(travelBounds, targetBounds, axis, from, to)
@@ -372,13 +378,13 @@
             >Y ↑</span
           >
           <div class="plot absolute inset-x-6 inset-y-12" bind:this={plot}>
-            {#if xy.x !== undefined && xy.y !== undefined && xy.x >= 0 && xy.x <= limits.x && xy.y >= 0 && xy.y <= limits.y}
+            {#if xy.x !== undefined && xy.y !== undefined && Number.isFinite(xy.x) && Number.isFinite(xy.y)}
               <div
                 class="nozzle"
                 data-stale={xyDisabled}
                 data-dragging={xyTarget !== undefined}
-                style:--x={String(xy.x / limits.x)}
-                style:--y={String(1 - xy.y / limits.y)}
+                style:--x={String(plateFraction(xy.x, limits.x))}
+                style:--y={String(1 - plateFraction(xy.y, limits.y))}
               >
                 <Button
                   variant="ghost"
